@@ -1,19 +1,85 @@
+import json
 import urllib.request
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import time
 
-global liste_nom
-liste_nom=[]
+def add_double_liste(l1,l2):
+    return [l1[0]+l2[0],l1[1]+l2[1]]
 
-def scrapper_NDSS(to_search,date_limite):
-    global liste_nom
-    results=""
-    for w_to_search in to_search:
+def history_writing(history_file, results):
+    if history_file != "None":
+        f_h=open(history_file,"a")
+        f_h.write(results[0])
+        f_h.close()
+
+def history_reading(history_file):
+    if history_file != "None":
+        history_f=open(history_file,"r")
+        history=history_f.read()
+        history_f.close()
+    else:
+        history=""
+    return history
+
+def maj_history(history_file,results):
+    history_writing(history_file,results)
+    return [history_reading(history_file),["",results[1]]]
+
+def Usenix(words_to_search,date_limit,history):
+    pad="#####################µ"
+    results=["",pad*3+"\n"+pad+"USENIXµ"+pad+"\n"+pad*3+"\n"]
+    for to_search_word in words_to_search:
+        results[1] +=pad+to_search_word+"µ"+pad+"\n"
+        to_search_format=to_search_word.replace(" ","_")
+        print(to_search_format)
+        flag=True
+        i=0
+        while flag:
+            with urllib.request.urlopen('https://www.usenix.org/search/site/'+to_search_format+'?page='+str(i)) as response:
+                html = str(response.read())
+                if len(html)<=52000:
+                    response_2=urllib.request.urlopen('https://www.usenix.org/search/site/'+to_search_format+'?page='+str(i))
+                    html = str(response_2.read())
+                    if len(html)<=52000:
+                        flag=False
+                        print(f"No more results, {i} page explored")
+                    else :
+                        i+=1
+                        results=add_double_liste(results,USENIX_html_parser(html,date_limit,history))
+                else :
+                    i+=1
+                    results=add_double_liste(results,USENIX_html_parser(html,date_limit,history))
+    return results
+
+def USENIX_html_parser(html,date_limit,history):
+    loc_h3=0
+    results_page=["",""]
+    while html.find("<h3 class",loc_h3) != -1:
+        loc_h3=html.find("<h3 class",loc_h3+2)
+        splited=html[loc_h3+33:loc_h3+500].split("""">""")
+        url=splited[0]
+        titre=splited[1].split('</a')[0]
+        loc_date=html.find("""<p class="search-info">""",loc_h3+2)
+        date=html[loc_date:loc_date+500].split(" ")[6]
+        try :
+            date=int(date)
+            if date_limit: 
+                if date<int(date_limit):
+                    continue
+        except :
+            pass
+        if url.find("https://")!=-1 and url.find("speaker")==-1 and url.find("technical-session")==-1 and url.find("workshop")==-1 and url.find("accepted-papers")==-1 and url.find("call-of-papers")==-1 and titre not in history:
+            results_page=add_double_liste(results_page,[titre,f"{url}µ{titre}µ{date}\n"])
+    return results_page
+
+def NDSS(words_to_search,date_limit,history):
+    pad="#####################µ"
+    results=["",pad*3+"\n"+pad+"NDSSµ"+pad+"\n"+pad*3+"\n"]
+    for w_to_search in words_to_search:
         print(w_to_search)
-        w_to_search=w_to_search.replace("_"," ")
-        results+=f"#####################µ{w_to_search}µ#####################\n"
+        results[1]+=pad+w_to_search+"µ"+pad+"\n"
         try:
             driver = webdriver.Firefox()
             driver.get("https://www.ndss-symposium.org/")
@@ -54,101 +120,122 @@ def scrapper_NDSS(to_search,date_limite):
                     while flag_let<len(name_tab):
                         name_tab[flag_let]=""
                         flag_let+=1
-                    
                     name=""
                     for lettre in name_tab:
                         name+=lettre
-                    if name.find("Call for Paper")==-1 and name.find("Accepted Paper")==-1 and name.find("NDSS")==-1 and name.find("Session")==-1 and name not in liste_nom:
-                        liste_nom+=[name]
-                        if date_limite:
+                    if name.find("Call for Paper")==-1 and name.find("Accepted Paper")==-1 and name.find("NDSS")==-1 and name.find("Session")==-1 and name not in history:
+                        if date_limit:
                             try :
                                 loc_annee=url.find("ndss20")
-                                if int(url[loc_annee+4:loc_annee+8])>int(date_limite):
-                                    results+=f"{url}µ{name}µ{url[loc_annee+4:loc_annee+8]}\n"
+                                if int(url[loc_annee+4:loc_annee+8])>int(date_limit):
+                                    results=add_double_liste(results,[name,f"{url}µ{name}µ{url[loc_annee+4:loc_annee+8]}\n"])
                             except:
-                                results+=f"{url}µ{name}µXXXX\n"
+                                results=add_double_liste(results,[name,f"{url}µ{name}µXXXX\n"])
                         else :
                             try :
                                 loc_annee=url.find("ndss20")
                                 if int(url[loc_annee+4:loc_annee+8]):
-                                    results+=f"{url}µ{name}µ{url[loc_annee+4:loc_annee+8]}\n"
+                                    results=add_double_liste(results,[name,f"{url}µ{name}µ{url[loc_annee+4:loc_annee+8]}\n"])
                             except:
-                                results+=f"{url}µ{name}µXXXX\n"
+                                results=add_double_liste(results,[name,f"{url}µ{name}µXXXX\n"])
             except:
                 driver.close()
         except:
             print(f"An error hapened for the word {w_to_search}")
     return results
 
-def html_parser_usenix(html,date_limite):
-    global liste_nom
-    loc_h3=0
-    results_page=""
-    while html.find("<h3 class",loc_h3) != -1:
-        loc_h3=html.find("<h3 class",loc_h3+2)
-        splited=html[loc_h3+33:loc_h3+500].split("""">""")
-        url=splited[0]
-        titre=splited[1].split('</a')[0]
-        if titre not in liste_nom:
-            liste_nom+=[titre]
-            loc_date=html.find("""<p class="search-info">""",loc_h3+2)
-            date=html[loc_date:loc_date+500].split(" ")[6]
-            try :
-                date=int(date)
-                if date_limite: 
-                    if date<int(date_limite):
-                        continue
-            except :
-                pass
-            if url.find("https://")!=-1 and url.find("speaker")==-1 and url.find("technical-session")==-1 and url.find("workshop")==-1 and url.find("accepted-papers")==-1 and url.find("call-of-papers")==-1:
-                results_page+=f"{url}µ{titre}µ{date}\n"
-    return results_page
-
-def usenix_data(liste_mots,date):
-    results =""
-    for to_search_word in to_search:
-        results +=f"#####################µ{to_search_word}µ#####################\n"
-        to_search_format=to_search_word.replace(" ","%2520")
-        print(to_search_format)
+def IEEE_ACM(words_to_search,date_limit,limite_IEEE_page,history):
+    pad="#####################µ"
+    results=["",pad*3+"\n"+pad+"IEEE ACMµ"+pad+"\n"+pad*3+"\n"]
+    for word in words_to_search:
+        results[1]+=pad+word+"µ"+pad+"\n"
         flag=True
-        i=0
-        while flag:
-            with urllib.request.urlopen('https://www.usenix.org/search/site/'+to_search_format+'?page='+str(i)) as response:
-                html = str(response.read())
-                if len(html)<=52000:
-                    response_2=urllib.request.urlopen('https://www.usenix.org/search/site/'+to_search_format+'?page='+str(i))
-                    html = str(response_2.read())
-                    if len(html)<=52000:
-                        flag=False
-                        print(f"No more results, {i} page explored")
-                    else :
-                        i+=1
-                        results+=html_parser_usenix(html,date)
-                else :
-                    i+=1
-                    results+=html_parser_usenix(html,date)
+        pn=1
+        while flag and pn<limite_IEEE_page:
+            driver = webdriver.Firefox()
+            complement_url=""
+            for elt in word.split(" "):
+                complement_url+=f"%20AND%20(%22Abstract%22:{elt})"
+            driver.get(f"https://ieeexplore.ieee.org/search/searchresult.jsp?action=search&newsearch=true&matchBoolean=true&queryText=(%22All%20Metadata%22:ACM){complement_url}&ranges={date_limit}_2024_Year&highlight=false&returnFacets=ALL&returnType=SEARCH&matchPubs=true&pageNumber={pn}")
+            time.sleep(4)
+            data=driver.page_source
+            driver.close()
+            if len(data)>200000:
+                results=add_double_liste(results,IEEE_html_parser(data,history))
+                print(f"Page number {pn} checked!")
+                pn+=1
+            else:
+                flag=False
     return results
 
-to_search=input("Que voulez vous chercher sur Usenix? [passer pour importer un fichier] ")
-if to_search=="":
-    file=input("Quel est le nom du fichier que vous souhaitez importer? (le fichier doit-être à l'intérieur du répertoire d'exécution) : ")
-    file_liste=open(file)
-    lines=file_liste.readlines()
-    file_liste.close()
-    to_search=[l[:-1] for l in lines]
-else :
-    to_search=[to_search]
-date=input("Voulez-vous une limitation de date? [N ou écrire l'année limite] : ")
-if date=="" or date=="N":
-    date=False
-results="URLµNOMµDATE\n"
-results+="#####################µ#####################µ#####################µ\n#####################µUSENIXµ#####################\n#####################µ#####################µ#####################\n"
-print("###############################################################\n##################### USENIX #####################\n###############################################################\n")
-results+=usenix_data(to_search,date)
-results+="#####################µ#####################µ#####################µ\n#####################µNDSSµ#####################\n#####################µ#####################µ#####################\n"
-print("###############################################################\n##################### NDSS #####################\n###############################################################\n")
-results+=scrapper_NDSS(to_search,date)
+def IEEE_html_parser(data,history):
+    results=["",""]
+    loc=0
+    flag=True
+    while flag:
+        try:
+            loc=data.index('xplanchortagroutinghandler="" xplhighlight="" xplmathjax="" class="fw-bold"',loc+100)
+            url=data[loc:loc+400].split('href="')[1].split('"')[0]
+            url="https://ieeexplore.ieee.org"+url
+            name=data[loc:loc+300].split("""/">""")[1].split("""</a>""")[0]
+            name=name.replace("""<span class="highlight">""","")
+            name=name.replace("""</span>""","")
+            if name not in history:
+                results=add_double_liste(results,[name,f"{url}µ{name}µ\n"])
+        except:
+            flag=False
+    return results
 
-f=open("results.txt","w")
-f.write(results)
-f.close()
+def IEEE_SP(words_to_search,date_limit,limite_IEEE_page,history):
+    pad="#####################µ"
+    results=["",pad*3+"\n"+pad+"IEEE SPµ"+pad+"\n"+pad*3+"\n"]
+    for word in words_to_search:
+        results[1]+=pad+word+"µ"+pad+"\n"
+        flag=True
+        pn=1
+        while flag and pn<limite_IEEE_page:
+            driver = webdriver.Firefox()
+            complement_url=""
+            for elt in word.split(" "):
+                complement_url+=f"%20AND%20(%22Abstract%22:{elt})"
+            driver.get(f"https://ieeexplore.ieee.org/search/searchresult.jsp?action=search&matchBoolean=true&queryText=(%22Publisher%22:IEEE){complement_url}%20AND%20(%22Publication%20Title%22:IEEE%20Symposium%20Security%20and%20Privacy)&ranges={date_limit}_2024_Year&highlight=true&returnFacets=ALL&returnType=SEARCH&matchPubs=true&pageNumber={pn}")
+            time.sleep(4)
+            data=driver.page_source
+            driver.close()
+            if len(data)>200000:
+                results=add_double_liste(results,IEEE_html_parser(data,history))
+                print(f"Page number {pn} checked!")
+                pn+=1
+            else:
+                flag=False
+    return results
+
+with open("conf.json", "r") as f:
+    data = json.load(f)
+    sites=data["site_to_search"] #sites à explorer
+    word_to_search=data["word_to_search"] #mots à chercher
+    date_limit=data["limit_date"] # dates limites basse
+    limite_IEEE_page=data["limit_IEEE_page"] #limites pages IEEE (pouvant être très élevé donc mieux de poser une limite)
+    history_file=data["history_file"] #fichier historique si besoin
+    print(sites,word_to_search,date_limit, history_file)
+    history=history_reading(history_file)
+    results=["",""]
+    for site in sites:
+        if site=="Usenix":
+            results=add_double_liste(results,Usenix(word_to_search,date_limit,history))
+            [history,results]=maj_history(history_file,results)
+
+        elif site=="NDSS":
+            results=add_double_liste(results,NDSS(word_to_search,date_limit,history))
+            [history,results]=maj_history(history_file,results)
+        elif site=="IEEE_ACM":
+            results=add_double_liste(results,IEEE_ACM(word_to_search,date_limit,limite_IEEE_page,history))
+            [history,results]=maj_history(history_file,results)
+        elif site=="IEEE_SP":
+            results=add_double_liste(results,IEEE_SP(word_to_search,date_limit,limite_IEEE_page,history))
+            [history,results]=maj_history(history_file,results)
+        else :
+            print(f"Oups! {site} is not in our current proposition! (cf README)")
+    f=open("results.txt","w")
+    f.write(results[1])
+    f.close()

@@ -1,6 +1,6 @@
 {
-    "site_to_search":["IEEE_ACM","Usenix","NDSS"],
-    "word_to_search":["Hardware Malware Detectors"],
+    "site_to_search":["IEEE_SP"],
+    "word_to_search":["Antivirus", "malware", "static analysis"],
     "limit_date":2016,
     "limit_IEEE_page":4,
     "history_file": "History_detection_malware.txt"
