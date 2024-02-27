@@ -2,7 +2,7 @@
 
 Petit développement d'un scraper web ayant pour but d'automatiser la documentation en allant chercher directement sur les sites des conférences les résultats de recherches par mots-clés (prenez un café en attendant :) )
 
-Actuellement, l'outil permet de faire des recherches sur NDSS, Usenix, IEEE ACM et IEEE SP.
+Actuellement, l'outil permet de faire des recherches sur NDSS, Usenix, IEEE ACM, IEEE SP et ACM CSS.
 
 ## Prérequis
 
