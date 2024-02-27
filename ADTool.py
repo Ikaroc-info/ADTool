@@ -210,6 +210,46 @@ def IEEE_SP(words_to_search,date_limit,limite_IEEE_page,history):
                 flag=False
     return results
 
+def ACM_CCS(words_to_search,date_limit,history):
+    pad="#####################µ"
+    results=["",pad*3+"\n"+pad+"ACM_CSSµ"+pad+"\n"+pad*3+"\n"]
+    for word in words_to_search:
+        results[1]+=pad+word+"µ"+pad+"\n"
+        tmp_word=word
+        if " " in tmp_word:
+            tmp_word=tmp_word.replace(" ","+")
+        flag=True
+        i=0
+        while flag:
+            driver = webdriver.Firefox()
+            driver.get(f"""https://dl.acm.org/action/doSearch?fillQuickSearch=false&target=advanced&expand=dl&field1=Abstract&text1=%22{word}%22&field2=ContentGroupTitle&text2=%22Computer+and+Communications+Security%22&AfterYear={date_limit}&startPage={i}&pageSize=20""")
+            time.sleep(4)
+            data=driver.page_source
+            driver.close()
+            i+=1
+            if len(data)<200000:
+                flag=False
+            results=add_double_liste(results,ACM_Parser(data,history))
+    return results
+
+def ACM_Parser(data,history):
+    results=["",""]
+    loc=0
+    flag=True
+    while flag:
+        try :
+            loc=data.index("""<span class="hlFld-Title"><a href=""",loc+100)
+        except:
+            flag=False
+            continue
+        name=data[loc:loc+300].split('">')[2].split("</a>")[0]
+        url="https://dl.acm.org"+data[loc:loc+300].split('<a href="')[1].split('">')[0]
+        date=data[loc-2000:loc].split("""data-title="Published:""")[1].split('">')[0].split(" ")[3]
+        if name not in history:
+            results=add_double_liste(results,[name,f"{url}µ{name}µ{date}\n"])
+    return results
+
+
 with open("conf.json", "r") as f:
     data = json.load(f)
     sites=data["site_to_search"] #sites à explorer
@@ -223,19 +263,17 @@ with open("conf.json", "r") as f:
     for site in sites:
         if site=="Usenix":
             results=add_double_liste(results,Usenix(word_to_search,date_limit,history))
-            [history,results]=maj_history(history_file,results)
-
         elif site=="NDSS":
             results=add_double_liste(results,NDSS(word_to_search,date_limit,history))
-            [history,results]=maj_history(history_file,results)
         elif site=="IEEE_ACM":
             results=add_double_liste(results,IEEE_ACM(word_to_search,date_limit,limite_IEEE_page,history))
-            [history,results]=maj_history(history_file,results)
         elif site=="IEEE_SP":
             results=add_double_liste(results,IEEE_SP(word_to_search,date_limit,limite_IEEE_page,history))
-            [history,results]=maj_history(history_file,results)
+        elif site=="ACM_CCS":
+            results=add_double_liste(results,ACM_CCS(word_to_search,date_limit,history))
         else :
             print(f"Oups! {site} is not in our current proposition! (cf README)")
+        [history,results]=maj_history(history_file,results)
     f=open("results.txt","w")
     f.write(results[1])
     f.close()
